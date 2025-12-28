@@ -74,7 +74,7 @@ const SetupView: React.FC<SetupViewProps> = ({ onStart }) => {
   const rimanenti = numGiocatori - numEliminati;
 
   const generaNomiCasuali = () => {
-    const nomiEsempio = ["Tommaso", "Alberto", "Marcello", "Gattoni", "Matteo", "Stefano", "Diego", "Manuela", "Rebecca", "Janik", "Mariluz", "Lea", "Luigi", "Karl", "Mara", "Sofia", "Ilai", "Mirella", "Carolina", "Sebba", "Valentina", "Carla", "Dibba", "Elena", "André", "Dario", "Sara", "Claudio", "Cate Lev", "BIC", "Barbara", "Arianna", "Sergio", "Silvia"];
+    const nomiEsempio = ["Tommaso", "Alberto", "Marcello", "Gattoni", "Matteo", "Stefano", "Diego", "Manuela", "Rebecca", "Janik", "Mariluz", "Lea", "Luigi", "Karl", "Mara", "Sofia", "Ilai", "Mirella", "Carolina", "Sebba", "Dibba", "Elena", "André", "Dario", "Sara", "Claudio", "Cate Lev", "BIC", "Barbara", "Arianna", "Sergio", "Silvia"];
     let nuoviNomi = [];
     for (let i = 0; i < numGiocatori; i++) {
       nuoviNomi.push(nomiEsempio[i] || `Giocatore ${i+1}`);
