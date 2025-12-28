@@ -1,0 +1,27 @@
+<?php
+header('Content-Type: application/json');
+$file = 'torneo_data.json';
+
+// Gestione Salvataggio (POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $input = file_get_contents('php://input');
+    if ($input) {
+        if (file_put_contents($file, $input)) {
+            echo json_encode(['status' => 'success', 'message' => 'Dati salvati correttamente']);
+        } else {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Errore nella scrittura del file']);
+        }
+    } else {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Nessun dato ricevuto']);
+    }
+} 
+else {
+    if (file_exists($file)) {
+        echo file_get_contents($file);
+    } else {
+        echo json_encode(null);
+    }
+}
+?>
