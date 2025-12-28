@@ -183,17 +183,18 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8">
         <header className="mb-8 text-center animate-in">
           <div className="flex justify-center mb-4">
-             <button 
-               onClick={() => fileInputRef.current?.click()}
-               className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-800 transition shadow-lg"
-             >
-               <Upload className="w-3.5 h-3.5" /> Importa Torneo Salvato
-             </button>
-             <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".json" />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-800 transition shadow-lg"
+            >
+              <Upload className="w-3.5 h-3.5" /> Importa Torneo Salvato
+            </button>
+            <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".json" />
           </div>
           <Trophy className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
-          <h1 className="text-3xl font-light text-white mb-1 tracking-tight">PeppaMaker</h1>
-          <p className="text-slate-400 font-medium tracking-widest text-xs uppercase">EDITION 51228</p>
+          <h1 className="text-6xl font-light text-white mb-1 tracking-tight">PeppaMaker</h1>
+          <p className="text-slate-400 font-medium tracking-widest text-xs uppercase">LA PRECISIONE IN OGNI MANO</p>
+          <p className="text-slate-100 font-small tracking-widest text-xs uppercase">V.51228</p>
         </header>
         <main className="max-w-4xl mx-auto"><SetupView onStart={handleStartTournament} /></main>
       </div>
