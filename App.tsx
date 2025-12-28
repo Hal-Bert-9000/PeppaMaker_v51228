@@ -209,7 +209,7 @@ const App: React.FC = () => {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Trophy className="text-emerald-500 w-4 h-4" />
-            <span className="font-bold tracking-tight text-xs sm:text-sm text-white whitespace-nowrap">Torneo di Peppa N.17</span>
+            <span className="font-bold tracking-tight text-xs sm:text-sm text-white whitespace-nowrap">PeppaMaker</span>
           </div>
           <div className="hidden sm:flex items-center gap-3 text-[9px] text-slate-500 font-black uppercase tracking-wider">
             <span className="bg-slate-800/50 px-2 py-0.5 rounded border border-slate-700/50">{data.config.numGiocatori} Giocatori</span>
