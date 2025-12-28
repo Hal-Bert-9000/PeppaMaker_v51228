@@ -192,8 +192,8 @@ const App: React.FC = () => {
              <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".json" />
           </div>
           <Trophy className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
-          <h1 className="text-3xl font-light text-white mb-1 tracking-tight">Torneo di Peppa N.17</h1>
-          <p className="text-slate-400 font-medium tracking-widest text-xs uppercase">XAMPP ENTERPRISE EDITION</p>
+          <h1 className="text-3xl font-light text-white mb-1 tracking-tight">PeppaMaker</h1>
+          <p className="text-slate-400 font-medium tracking-widest text-xs uppercase">EDITION 51228</p>
         </header>
         <main className="max-w-4xl mx-auto"><SetupView onStart={handleStartTournament} /></main>
       </div>
