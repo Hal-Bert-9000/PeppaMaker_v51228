@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { TournamentData, TableScore, Player, HandAssignment } from '../types';
-import { Table as TableIcon, ListOrdered, CalendarDays, LineChart, AlertCircle, TrendingUp, PartyPopper, Camera, Coffee, ShieldCheck, Skull, X, Trophy, BarChart3 } from 'lucide-react';
+import { Table as TableIcon, ListOrdered, CalendarDays, LineChart, AlertCircle, TrendingUp, PartyPopper, Camera, Coffee, ShieldCheck, Skull, X, Trophy, BarChart3, FlaskConical } from 'lucide-react';
 import { generateNextTopHand, updateRelazioni } from '../utils/tournamentLogic';
 import PlanningView from './PlanningView';
 
@@ -204,9 +204,9 @@ const PodiumModal: React.FC<{ data: TournamentData; onClose: () => void }> = ({ 
         </div>
         <div className="flex flex-wrap justify-center gap-2">
           {players.map(p => (
-            <div key={p.id} className="bg-slate-800/40 rounded-2xl p-3 border border-slate-700/50 flex items-center gap-4 min-w-[180px] justify-between transition-transform hover:scale-105 shadow-md">
-              <span className="text-sm font-black text-white">{p.name}</span>
-              <span className={`text-lg font-black ${colorClass}`}>{data.punteggi[p.id]}</span>
+            <div key={p.id} className="bg-slate-800/40 rounded-2xl p-3 border border-slate-700/75 flex items-center gap-4 min-w-[180px] justify-between transition-transform hover:scale-105 shadow-md">
+              <span className="text-[0.875rem] font-bold text-white">{p.name}</span>
+              <span className={`text-[0.875rem] font-bold ${colorClass}`}>{data.punteggi[p.id]}</span>
             </div>
           ))}
         </div>
@@ -224,7 +224,7 @@ const PodiumModal: React.FC<{ data: TournamentData; onClose: () => void }> = ({ 
         </div>
 
         <PartyPopper className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-        <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-8">LA CORTE DELLA PEPPA</h2>
+        <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-8">{data.tournamentName}</h2>
         
         <div className="space-y-6">
           {renderGroup(kings.length === 1 ? `${getGenderedKing(kings[0].name)} DELLA PEPPA` : "RE DELLA PEPPA", kings, "text-amber-400", <Trophy className="w-5 h-5" />)}
@@ -236,7 +236,7 @@ const PodiumModal: React.FC<{ data: TournamentData; onClose: () => void }> = ({ 
                <div className="text-lg font-black uppercase tracking-[0.2em] mb-3 text-emerald-500">SENATORI</div>
                <div className="flex flex-wrap justify-center gap-2">
                  {senators.sort((a,b) => (data.punteggi[b.id]||0) - (data.punteggi[a.id]||0)).map(p => (
-                   <div key={p.id} className="bg-slate-800/20 px-4 py-1.5 rounded-xl border border-slate-800 text-slate-300 text-sm font-bold flex gap-3 shadow-sm">
+                   <div key={p.id} className="bg-slate-800/20 px-4 py-1.5 rounded-xl border border-slate-800/75 text-slate-300 text-[0.875rem] font-bold flex gap-3 shadow-sm">
                      {p.name} <span className="text-emerald-500">{data.punteggi[p.id]}</span>
                    </div>
                  ))}
@@ -251,7 +251,7 @@ const PodiumModal: React.FC<{ data: TournamentData; onClose: () => void }> = ({ 
                </div>
                <div className="flex flex-wrap justify-center gap-2">
                  {plebs.sort((a,b) => (data.punteggi[a.id]||0) - (data.punteggi[b.id]||0)).map(p => (
-                   <div key={p.id} className="bg-rose-950/10 px-4 py-1.5 rounded-xl border border-rose-900/10 text-rose-500/60 text-xs font-medium flex gap-3 shadow-sm">
+                   <div key={p.id} className="bg-rose-950/10 px-4 py-1.5 rounded-xl border border-rose-900/10 text-rose-500/60 text-[0.875rem] font-bold flex gap-3 shadow-sm">
                      {p.name} <span>{data.punteggi[p.id]}</span>
                    </div>
                  ))}
@@ -317,6 +317,25 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({ data, setData }) => {
     setCurrentHandScores(prev => ({ ...prev, [tIdx]: newScores }));
   };
 
+  const generateAllRandomScores = () => {
+    if (!currentHandInfo) return;
+    const allTableScores: Record<number, TableScore> = {};
+    currentHandInfo.tavoli.forEach((table, tIdx) => {
+        let vals = [0, 0, 0, 0];
+        vals[0] = Math.floor(Math.random() * 31) - 15;
+        vals[1] = Math.floor(Math.random() * 31) - 15;
+        vals[2] = Math.floor(Math.random() * 31) - 15;
+        vals[3] = -(vals[0] + vals[1] + vals[2]);
+        
+        const tableScore: TableScore = {};
+        table.forEach((pid, i) => {
+            tableScore[pid] = vals[i];
+        });
+        allTableScores[tIdx] = tableScore;
+    });
+    setCurrentHandScores(allTableScores);
+  };
+
   const autoBalance = (tIdx: number) => {
     if (!currentHandInfo || !currentHandInfo.tavoli[tIdx]) return;
     const t = currentHandInfo.tavoli[tIdx];
@@ -345,7 +364,6 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({ data, setData }) => {
     const isEndOfSocialOrRecupero = currentHandInfo.fase !== 'top' && (nextPlanning[data.manoAttuale]?.fase === 'top' || data.manoAttuale === nextPlanning.length);
 
     if (isEndOfSocialOrRecupero) {
-      // FIX: Use config.numEliminatiDopoFase1 instead of remainder to respect user setup
       const numToEliminate = data.config.numEliminatiDopoFase1;
       const sorted = [...nextGiocatori].filter(p => !p.isEliminated).sort((a, b) => newPunteggi[b.id] - newPunteggi[a.id]);
       const toEliminateIds = sorted.slice(sorted.length - numToEliminate).map(p => p.id);
@@ -466,6 +484,15 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({ data, setData }) => {
 
         <div className="flex items-center gap-4 pr-1">
           <div className="bg-slate-900 border border-slate-800 px-4 py-1.5 rounded-xl shadow-inner flex items-center gap-2">
+             {data.config.testMode && (
+                <button 
+                  onClick={generateAllRandomScores}
+                  className="bg-amber-900/40 text-amber-500 px-2 py-1.5 rounded-lg border border-amber-900/50 hover:bg-amber-900/60 transition shadow-sm"
+                  title="Punteggi Casuali Globali"
+                >
+                  <span className="text-[10px] font-black uppercase tracking-tighter">RND</span>
+                </button>
+             )}
              <span className="text-xl font-black text-emerald-400 tracking-tighter">
                 {currentHandInfo?.fase === 'recupero' ? 'RECUPERO' : 'Mano'} {data.manoAttuale} <span className="text-slate-600 text-xs font-normal">/ {data.planningCompleto.length}</span>
              </span>
@@ -555,9 +582,15 @@ const LiveDashboard: React.FC<LiveDashboardProps> = ({ data, setData }) => {
 
         {activeTab === 'ranking' && (
           <div className="w-full max-w-[1450px] px-4 mx-auto pb-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {renderRankingTable(ranking.slice(0, Math.ceil(ranking.length / 2)), 0)}
-                {renderRankingTable(ranking.slice(Math.ceil(ranking.length / 2)), Math.ceil(ranking.length / 2))}
+            <div className={ranking.length > 12 ? "grid grid-cols-1 lg:grid-cols-2 gap-4" : "max-w-2xl mx-auto"}>
+                {ranking.length > 12 ? (
+                    <>
+                        {renderRankingTable(ranking.slice(0, Math.ceil(ranking.length / 2)), 0)}
+                        {renderRankingTable(ranking.slice(Math.ceil(ranking.length / 2)), Math.ceil(ranking.length / 2))}
+                    </>
+                ) : (
+                    renderRankingTable(ranking, 0)
+                )}
             </div>
           </div>
         )}

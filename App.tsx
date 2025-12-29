@@ -72,7 +72,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleStartTournament = (config: TournamentConfig, customNames: string[]) => {
+  const handleStartTournament = (config: TournamentConfig, customNames: string[], tournamentName: string) => {
     const basePlayers: Player[] = Array.from({ length: config.numGiocatori }).map((_, i) => ({
       id: `p${i}`,
       name: customNames[i] || NOMI_DEFAULT[i] || `Giocatore ${i + 1}`,
@@ -83,6 +83,7 @@ const App: React.FC = () => {
     const { planning, relazioni } = generatePlanning(config, players);
 
     const initialData: TournamentData = {
+      tournamentName,
       config,
       giocatori: players,
       punteggi: Object.fromEntries(players.map(p => [p.id, 0])),
@@ -194,7 +195,7 @@ const App: React.FC = () => {
           <Trophy className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
           <h1 className="text-6xl font-light text-white mb-1 tracking-tight">PeppaMaker</h1>
           <p className="text-slate-400 font-medium tracking-widest text-xs uppercase">LA PRECISIONE IN OGNI MANO</p>
-          <p className="text-slate-100 font-small tracking-widest text-xs uppercase">V.51228</p>
+          <p className="text-slate-100 font-small tracking-widest text-xs uppercase">V.51229</p>
         </header>
         <main className="max-w-4xl mx-auto"><SetupView onStart={handleStartTournament} /></main>
       </div>
@@ -210,7 +211,7 @@ const App: React.FC = () => {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Trophy className="text-emerald-500 w-4 h-4" />
-            <span className="font-bold tracking-tight text-xs sm:text-sm text-white whitespace-nowrap">PeppaMaker</span>
+            <span className="font-bold tracking-tight text-xs sm:text-sm text-white whitespace-nowrap">{data.tournamentName}</span>
           </div>
           <div className="hidden sm:flex items-center gap-3 text-[9px] text-slate-500 font-black uppercase tracking-wider">
             <span className="bg-slate-800/50 px-2 py-0.5 rounded border border-slate-700/50">{data.config.numGiocatori} Giocatori</span>

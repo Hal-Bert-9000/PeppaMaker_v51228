@@ -1,19 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { TournamentConfig } from '../types';
-import { AlertTriangle, CheckCircle2, UserPlus, FlaskConical, Dices, Info, Zap } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, UserPlus, FlaskConical, Dices, Info, Zap, Layout } from 'lucide-react';
 
 interface SetupViewProps {
-  onStart: (config: TournamentConfig, customNames: string[]) => void;
+  onStart: (config: TournamentConfig, customNames: string[], tournamentName: string) => void;
 }
 
 const SetupView: React.FC<SetupViewProps> = ({ onStart }) => {
-  const [numGiocatori, setNumGiocatori] = useState(21);
+  const [tournamentName, setTournamentName] = useState('TORNEO PEPPA');
+  const [numGiocatori, setNumGiocatori] = useState(22);
   const [maniFase1, setManiFase1] = useState(8);
-  const [maniFase2, setManiFase2] = useState(4);
-  const [numEliminati, setNumEliminati] = useState(1);
+  const [maniFase2, setManiFase2] = useState(7);
+  const [numEliminati, setNumEliminati] = useState(2);
   const [nomiGiocatori, setNomiGiocatori] = useState('');
   const [testMode, setTestMode] = useState(false);
+  const [recoveryPosition, setRecoveryPosition] = useState<'start' | 'end'>('end');
 
   const calcolaManiSocialConsigliate = (n: number) => {
     const r = n % 4;
@@ -46,8 +48,6 @@ const SetupView: React.FC<SetupViewProps> = ({ onStart }) => {
     return bestH;
   };
 
-  // Only set initial default for numEliminati when numGiocatori is first loaded or changed if user hasn't touched it, 
-  // but let's just make it a soft suggestion rather than a hard effect that overrides user choice.
   useEffect(() => {
     const consigliate = calcolaManiSocialConsigliate(numGiocatori);
     setManiFase1(consigliate);
@@ -74,7 +74,7 @@ const SetupView: React.FC<SetupViewProps> = ({ onStart }) => {
   const rimanenti = numGiocatori - numEliminati;
 
   const generaNomiCasuali = () => {
-    const nomiEsempio = ["Tommaso", "Alberto", "Marcello", "Gattoni", "Matteo", "Stefano", "Diego", "Manuela", "Rebecca", "Janik", "Mariluz", "Lea", "Luigi", "Karl", "Mara", "Sofia", "Ilai", "Mirella", "Carolina", "Sebba", "Dibba", "Elena", "André", "Dario", "Sara", "Claudio", "Cate Lev", "BIC", "Barbara", "Arianna", "Sergio", "Silvia"];
+    const nomiEsempio = ["Tommaso", "Alberto", "Marcello", "Gattoni", "Matteo", "Stefano", "Diego", "Manuela", "Rebecca", "Janik", "Mariluz", "Lea", "Luigi", "Karl", "Mara", "Sofia", "Ilai", "Mirella", "Carolina", "Sebba", "Valentina", "Carla", "Dibba", "Elena", "André", "Dario", "Sara", "Claudio", "Cate Lev", "BIC", "Barbara", "Arianna", "Sergio", "Silvia"];
     let nuoviNomi = [];
     for (let i = 0; i < numGiocatori; i++) {
       nuoviNomi.push(nomiEsempio[i] || `Giocatore ${i+1}`);
@@ -99,16 +99,24 @@ const SetupView: React.FC<SetupViewProps> = ({ onStart }) => {
       maniFase1,
       maniFase2,
       numEliminatiDopoFase1: numEliminati,
-      testMode
-    }, names);
+      testMode,
+      recoveryPosition
+    }, names, tournamentName || 'TORNEO PEPPA');
   };
 
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl animate-in fade-in zoom-in duration-300">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2 uppercase tracking-tight">
-          <UserPlus className="text-emerald-500" /> Setup Torneo
-        </h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div className="flex-1 w-full sm:w-auto group">
+          <label className="block text-[9px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-1 opacity-60">Titolo del Torneo</label>
+          <input 
+            type="text" 
+            value={tournamentName} 
+            onChange={e => setTournamentName(e.target.value.toUpperCase())}
+            className="bg-transparent border-b-2 border-emerald-500/20 focus:border-emerald-500 outline-none text-2xl font-black text-white uppercase w-full max-w-md tracking-tight transition-all placeholder:text-slate-700"
+            placeholder="NOME DEL TORNEO"
+          />
+        </div>
         <div className="flex items-center gap-3 bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-700">
           <FlaskConical className={`w-5 h-5 ${testMode ? 'text-yellow-400' : 'text-slate-600'}`} />
           <span className="text-xs font-bold text-slate-400 uppercase">Test Mode</span>
@@ -152,13 +160,32 @@ const SetupView: React.FC<SetupViewProps> = ({ onStart }) => {
             </div>
 
             {serveRecupero && (
-              <div className="bg-amber-900/20 border border-amber-900/30 p-3 rounded-xl animate-pulse">
-                <div className="flex items-center gap-2 mb-1">
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Recupero stimato: {recoveryHandsEstimate} {recoveryHandsEstimate === 1 ? 'mano' : 'mani'}</span>
+              <div className="bg-amber-900/10 border border-amber-900/30 p-4 rounded-xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  <span className="text-[11px] font-black text-amber-500 uppercase tracking-widest">Configurazione FASE LEA ({recoveryHandsEstimate} mani)</span>
                 </div>
-                <p className="text-[9px] text-amber-200/60 leading-tight uppercase font-medium">
-                  Pareggio automatico dei riposi prima della Fase Top.
+                
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">Posizione nel planning</label>
+                  <div className="flex bg-slate-950/50 rounded-lg p-1 border border-slate-700/50">
+                    <button 
+                      onClick={() => setRecoveryPosition('start')}
+                      className={`flex-1 py-1.5 text-[9px] font-black uppercase rounded-md transition-all ${recoveryPosition === 'start' ? 'bg-amber-600 text-white shadow-lg scale-100' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      Inizio Social
+                    </button>
+                    <button 
+                      onClick={() => setRecoveryPosition('end')}
+                      className={`flex-1 py-1.5 text-[9px] font-black uppercase rounded-md transition-all ${recoveryPosition === 'end' ? 'bg-amber-600 text-white shadow-lg scale-100' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      Fine Social
+                    </button>
+                  </div>
+                </div>
+                
+                <p className="text-[9px] text-amber-200/50 leading-tight uppercase font-medium italic">
+                  I riposi verranno pareggiati {recoveryPosition === 'start' ? 'prima di iniziare' : 'al termine del'}la Fase Social.
                 </p>
               </div>
             )}

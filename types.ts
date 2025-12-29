@@ -19,10 +19,12 @@ export interface TournamentConfig {
   maniFase1: number;
   maniFase2: number;
   numEliminatiDopoFase1: number;
-  testMode: boolean; 
+  testMode: boolean;
+  recoveryPosition: 'start' | 'end';
 }
 
 export interface TournamentData {
+  tournamentName: string;
   config: TournamentConfig;
   giocatori: Player[];
   punteggi: Record<string, number>;

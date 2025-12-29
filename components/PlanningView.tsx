@@ -11,7 +11,7 @@ interface PlanningViewProps {
   forceStats?: boolean;
 }
 
-type SortKey = 'name' | 'score' | 'playCount' | 'restCount' | 'avg' | 'max' | 'min' | 'positiveCount' | 'maxStreak' | 'cappottiCount';
+type SortKey = 'name' | 'score' | 'playConclusi' | 'restConclusi' | 'avg' | 'max' | 'min' | 'positiveCount' | 'maxStreak' | 'cappottiCount';
 
 const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, currentHandScores = {}, onUpdateData, forceStats = false }) => {
   const [localShowStats, setLocalShowStats] = useState(false);
@@ -19,6 +19,12 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
   const rotationPattern = data.rotationPattern || 'DS-C';
   
   const showStats = forceStats || localShowStats;
+
+  const toggleRotationPattern = () => {
+    if (!onUpdateData) return;
+    const nextPattern = rotationPattern === 'DS-C' ? 'DSC-' : 'DS-C';
+    onUpdateData({ ...data, rotationPattern: nextPattern });
+  };
 
   const maxTavoli = data.planningCompleto.length > 0 
     ? Math.max(...data.planningCompleto.map(m => m.fase === 'top' ? Math.floor(data.giocatori.filter(p => !p.isEliminated).length / 4) : m.tavoli.length), Math.floor(data.config.numGiocatori / 4)) 
@@ -39,8 +45,10 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
       }
     });
 
-    if (scores[pid] !== 45) return false;
-    return table.every(id => id === pid || scores[id] === -15);
+    if (scores[pid] === 45) {
+        return table.every(id => id === pid || scores[id] === -15);
+    }
+    return false;
   };
 
   const baseStats = useMemo(() => {
@@ -72,7 +80,7 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
       });
 
       const score = data.punteggi[p.id] || 0;
-      const realAvg = handScores.length > 0 ? handScores.reduce((a, b) => a + (isNaN(b) ? 0 : b), 0) / handScores.length : 0;
+      const realAvg = handScores.length > 0 ? handScores.reduce((a, b) => a + b, 0) / handScores.length : 0;
       const max = handScores.length > 0 ? Math.max(...handScores) : 0;
       const min = handScores.length > 0 ? Math.min(...handScores) : 0;
       const positiveCount = handScores.filter(s => s > 0).length;
@@ -110,6 +118,13 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
     return [...baseStats].sort((a, b) => {
       const aVal = a[sortConfig.key];
       const bVal = b[sortConfig.key];
+      
+      if (sortConfig.key === 'name') {
+        return sortConfig.dir === 'asc' 
+          ? String(aVal).localeCompare(String(bVal))
+          : String(bVal).localeCompare(String(aVal));
+      }
+
       if (aVal === bVal) return a.name.localeCompare(b.name);
       return sortConfig.dir === 'asc' 
         ? (Number(aVal) < Number(bVal) ? -1 : 1)
@@ -124,33 +139,118 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
     }));
   };
 
-  const exportToExcel = () => {
-    const sortedByName = [...baseStats].sort((a, b) => a.name.localeCompare(b.name));
+  const getRotationChar = (manoIdx: number) => {
+    const chars = rotationPattern === 'DS-C' ? ['D', 'S', '-', 'C'] : ['D', 'S', 'C', '-'];
+    return chars[manoIdx % 4];
+  };
+
+  const exportPlanningXLS = () => {
+    let csvRows = [];
     
-    const headers = ["Giocatore", "Punteggio", "Media Punti", "Max", "Min", "Mani Pos.", "Streak", "Cappotti", "Mani Totali", "Riposi Totali"];
-    const rows = sortedByName.map(s => [
-      s.name,
-      s.score,
-      s.playedHandsCount > 0 ? s.avg.toFixed(2) : "-",
-      s.playedHandsCount > 0 ? s.max : "-",
-      s.playedHandsCount > 0 ? s.min : "-",
-      s.positiveCount,
-      s.maxStreak,
-      s.cappottiCount,
-      s.playConclusi,
-      s.restConclusi
-    ]);
+    // --- SEZIONE 1: PLANNING ---
+    csvRows.push("PLANNING TORNEO");
+    let header = ["N.", "R"];
+    for (let i = 1; i <= maxTavoli; i++) {
+        header.push(`T${i}-A`, `T${i}-B`, `T${i}-C`, `T${i}-D`);
+    }
+    header.push("Riposo");
+    csvRows.push(header.join(";"));
 
-    const csvContent = [
-      headers.join(";"),
-      ...rows.map(r => r.join(";"))
-    ].join("\n");
+    data.planningCompleto.forEach((mano, idx) => {
+        // Riga Nomi
+        let nameRow = [mano.mano, getRotationChar(idx)];
+        for (let tIdx = 0; tIdx < maxTavoli; tIdx++) {
+            const tavolo = mano.tavoli[tIdx];
+            if (tavolo) {
+                tavolo.forEach(pid => {
+                    nameRow.push(data.giocatori.find(g => g.id === pid)?.name || "-");
+                });
+            } else {
+                nameRow.push("-", "-", "-", "-");
+            }
+        }
+        const riposantiNames = mano.riposanti.map(pid => data.giocatori.find(g => g.id === pid)?.name).join(", ");
+        nameRow.push(riposantiNames || "-");
+        csvRows.push(nameRow.join(";"));
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        // Riga Punteggi
+        let scoreRow = ["-", "-"];
+        for (let tIdx = 0; tIdx < maxTavoli; tIdx++) {
+            const tavolo = mano.tavoli[tIdx];
+            if (tavolo) {
+                tavolo.forEach(pid => {
+                    let s = "-";
+                    if (mano.mano < data.manoAttuale || data.status === 'finished') {
+                        const history = data.storicoPunteggi[pid];
+                        if (history && history[mano.mano] !== undefined) {
+                            s = String(history[mano.mano] - (history[mano.mano - 1] ?? 0));
+                        }
+                    }
+                    scoreRow.push(s);
+                });
+            } else {
+                scoreRow.push("-", "-", "-", "-");
+            }
+        }
+        scoreRow.push("-");
+        csvRows.push(scoreRow.join(";"));
+    });
+
+    // --- SEZIONE 2: CLASSIFICA ---
+    csvRows.push("");
+    csvRows.push("CLASSIFICA ATTUALE");
+    csvRows.push(["Pos", "Nome", "Punti", "Media", "Max", "Min", "Mani +", "Streak", "Cappotti"].join(";"));
+    const rankedPlayers = [...baseStats].sort((a,b) => b.score - a.score);
+    rankedPlayers.forEach((s, i) => {
+        csvRows.push([
+            i+1,
+            s.name,
+            s.score,
+            s.playedHandsCount > 0 ? s.avg.toFixed(1) : "-",
+            s.max,
+            s.min,
+            s.positiveCount,
+            s.maxStreak,
+            s.cappottiCount
+        ].join(";"));
+    });
+
+    // --- SEZIONE 3: TABELLA RISULTATI PER GIOCATORE (Matrice Analitica ordinata per Ranking) ---
+    csvRows.push("");
+    csvRows.push("TABELLA RISULTATI ANALITICI (Ordinata per Punteggio Totale)");
+    
+    // Intestazione Matrice: nome / 1 / 2 / 3 / ... / tot
+    let matrixHeader = ["Giocatore"];
+    for (let m = 1; m <= data.planningCompleto.length; m++) {
+        matrixHeader.push(String(m));
+    }
+    matrixHeader.push("TOTALE");
+    csvRows.push(matrixHeader.join(";"));
+
+    // Righe Giocatori ordinati per punteggio: nome / score hand 1 / hand 2 / ... / total
+    rankedPlayers.forEach(pStat => {
+        let pRow = [pStat.name];
+        let runningTotal = 0;
+        
+        for (let m = 1; m <= data.planningCompleto.length; m++) {
+            const history = data.storicoPunteggi[pStat.id];
+            if (history && history[m] !== undefined && (m < data.manoAttuale || data.status === 'finished')) {
+                const handScore = history[m] - (history[m - 1] ?? 0);
+                pRow.push(String(handScore));
+                runningTotal += handScore;
+            } else {
+                pRow.push("-");
+            }
+        }
+        pRow.push(String(runningTotal));
+        csvRows.push(pRow.join(";"));
+    });
+
+    const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `Statistiche_Torneo_Peppa.csv`);
+    link.setAttribute("download", `Planning_${data.tournamentName.replace(/\s+/g, '_')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -161,17 +261,6 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
     const tableNum = tIdx + 1;
     const seatChar = String.fromCharCode(65 + (tIdx * 4) + sIdx);
     return `${tableNum}${seatChar}`;
-  };
-
-  const getRotationChar = (manoIdx: number) => {
-    const chars = rotationPattern === 'DS-C' ? ['D', 'S', '-', 'C'] : ['D', 'S', 'C', '-'];
-    return chars[manoIdx % 4];
-  };
-
-  const toggleRotationPattern = () => {
-    if (!onUpdateData || data.status !== 'planning') return;
-    const newPattern = rotationPattern === 'DS-C' ? 'DSC-' : 'DS-C';
-    onUpdateData({ ...data, rotationPattern: newPattern });
   };
 
   const truncateName = (name: string | undefined) => {
@@ -199,8 +288,10 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
       });
     }
 
-    if (scores[pid] !== 45) return false;
-    return table.every(id => id === pid || scores[id] === -15);
+    if (scores[pid] === 45) {
+        return table.every(id => id === pid || scores[id] === -15);
+    }
+    return false;
   };
 
   const renderPlayer = (playerId: string | undefined, manoNum: number, tableIdx: number, isInactiveTable: boolean = false) => {
@@ -243,7 +334,7 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
     
     return (
       <div className={`flex flex-col items-center py-1 px-0.5 min-h-[48px] ${cellWidth} justify-center transition-colors border-r border-slate-800/30 last:border-r-0 ${isCappotto ? 'bg-rose-900/40' : ''}`}>
-        <span className={`text-[11px] font-narrow truncate w-full text-center leading-none ${player?.isEliminated ? 'line-through text-rose-500/50' : isCappotto ? 'text-rose-100' : 'text-slate-200'}`}>
+        <span className={`text-[14px] font-narrow truncate w-full text-center leading-none ${player?.isEliminated ? 'line-through text-rose-500/50' : isCappotto ? 'text-rose-100' : 'text-slate-200'}`}>
           {truncateName(player?.name)}
         </span>
         {showScores && (
@@ -279,11 +370,11 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
             <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30 shrink-0">
               <div className="flex items-center gap-3">
                 <BarChart3 className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">Statistiche Avanzate Torneo</h3>
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">Statistiche: {data.tournamentName}</h3>
               </div>
               <div className="flex items-center gap-4">
                 <button 
-                  onClick={exportToExcel}
+                  onClick={exportPlanningXLS}
                   className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
                 >
                   <Download className="w-4 h-4" /> Esporta XLS
@@ -299,34 +390,34 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
               <table className="w-full text-left border-collapse table-fixed">
                 <thead className="sticky top-0 bg-slate-800 z-10">
                   <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors w-1/5" onClick={() => handleSort('name')}>
+                    <th className="p-3 border-b border-slate-700 cursor-pointer hover:text-white transition-colors w-1/5" onClick={() => handleSort('name')}>
                       <div className="flex items-center gap-1">Giocatore <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('score')}>
+                    <th className="p-3 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('score')}>
                       <div className="flex items-center justify-center gap-1">Punti <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center bg-slate-800/40 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('avg')}>
+                    <th className="p-3 border-b border-slate-700 text-center bg-slate-800/40 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('avg')}>
                       <div className="flex items-center justify-center gap-1">Media <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('max')}>
+                    <th className="p-3 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('max')}>
                       <div className="flex items-center justify-center gap-1">Max <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('min')}>
+                    <th className="p-3 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('min')}>
                       <div className="flex items-center justify-center gap-1">Min <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('positiveCount')}>
+                    <th className="p-3 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('positiveCount')}>
                       <div className="flex items-center justify-center gap-1">Mani + <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('maxStreak')}>
+                    <th className="p-3 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('maxStreak')}>
                       <div className="flex items-center justify-center gap-1">Streak <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('cappottiCount')}>
+                    <th className="p-3 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('cappottiCount')}>
                       <div className="flex items-center justify-center gap-1">Cappotti <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('playCount')}>
+                    <th className="p-3 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('playConclusi')}>
                       <div className="flex items-center justify-center gap-1">Mani <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
-                    <th className="p-4 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('restCount')}>
+                    <th className="p-3 border-b border-slate-700 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('restConclusi')}>
                       <div className="flex items-center justify-center gap-1">Riposi <ArrowUpDown className="w-3 h-3 opacity-30" /></div>
                     </th>
                   </tr>
@@ -334,57 +425,57 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
                 <tbody className="divide-y divide-slate-800">
                   {tournamentStats.map((stat) => (
                     <tr key={stat.id} className={`hover:bg-slate-800/30 transition-colors ${stat.isEliminated ? 'opacity-40' : ''}`}>
-                      <td className="p-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                      <td className="p-1.5 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
                         <div className="flex flex-col">
-                          <span className={`font-bold text-sm ${stat.isEliminated ? 'line-through text-slate-500' : 'text-slate-200'}`}>
+                          <span className={`font-bold text-[1.25rem] ${stat.isEliminated ? 'line-through text-slate-500' : 'text-slate-200'}`}>
                             {stat.name}
                           </span>
-                          {stat.isEliminated && <span className="text-[8px] text-rose-500 font-black uppercase">Eliminato</span>}
+                          {stat.isEliminated && <span className="text-[10px] text-rose-500 font-black uppercase">Eliminato</span>}
                         </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <span className="text-sm font-black text-emerald-400">{stat.score}</span>
+                      <td className="p-1.5 text-center">
+                        <span className="text-[1.25rem] font-black text-emerald-400">{stat.score}</span>
                       </td>
-                      <td className="p-4 text-center bg-slate-800/20">
-                        <div className="inline-flex items-center gap-1">
-                          <Activity className="w-3 h-3 text-emerald-500 opacity-50" />
-                          <span className={`text-sm font-black ${stat.avg > 0 ? 'text-emerald-400' : stat.avg < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                      <td className="p-1.5 text-center bg-slate-800/20">
+                        <div className="inline-flex items-center justify-center gap-1 w-full text-[1.25rem]">
+                          <Activity className="w-5 h-5 text-emerald-500 opacity-50" />
+                          <span className={`font-black ${stat.avg > 0 ? 'text-emerald-400' : stat.avg < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
                             {stat.playedHandsCount > 0 ? stat.avg.toFixed(1) : '-'}
                           </span>
                         </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <div className="inline-flex items-center gap-1">
-                          <ChevronUp className="w-3 h-3 text-emerald-500" />
-                          <span className="text-sm font-black text-emerald-400">{stat.playedHandsCount > 0 ? `+${stat.max}` : '-'}</span>
+                      <td className="p-1.5 text-center">
+                        <div className="inline-flex items-center justify-center gap-1 w-full text-[1.25rem]">
+                          <ChevronUp className="w-5 h-5 text-emerald-500" />
+                          <span className="font-black text-emerald-400">{stat.playedHandsCount > 0 ? `+${stat.max}` : '-'}</span>
                         </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <div className="inline-flex items-center gap-1">
-                          <ChevronDown className="w-3 h-3 text-rose-500" />
-                          <span className="text-sm font-black text-rose-400">{stat.playedHandsCount > 0 ? stat.min : '-'}</span>
+                      <td className="p-1.5 text-center">
+                        <div className="inline-flex items-center justify-center gap-1 w-full text-[1.25rem]">
+                          <ChevronDown className="w-5 h-5 text-rose-500" />
+                          <span className="font-black text-rose-400">{stat.playedHandsCount > 0 ? stat.min : '-'}</span>
                         </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <span className="text-sm font-black text-emerald-400">{stat.positiveCount}</span>
+                      <td className="p-1.5 text-center">
+                        <span className="text-[1.25rem] font-black text-emerald-400">{stat.positiveCount}</span>
                       </td>
-                      <td className="p-4 text-center">
-                        <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                          <TrendingUp className="w-3 h-3 text-emerald-400" />
-                          <span className="text-sm font-black text-emerald-400">{stat.maxStreak}</span>
+                      <td className="p-1.5 text-center">
+                        <div className="inline-flex items-center justify-center gap-1.5 bg-emerald-500/10 px-3 py-0.5 rounded border border-emerald-500/20 w-auto text-[1.25rem]">
+                          <TrendingUp className="w-5 h-5 text-emerald-400" />
+                          <span className="font-black text-emerald-400">{stat.maxStreak}</span>
                         </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <div className="inline-flex items-center gap-1.5 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                          <Trophy className="w-3 h-3 text-rose-400" />
-                          <span className="text-sm font-black text-rose-400">{stat.cappottiCount}</span>
+                      <td className="p-1.5 text-center">
+                        <div className="inline-flex items-center justify-center gap-1.5 bg-rose-500/10 px-3 py-0.5 rounded border border-rose-500/20 w-auto text-[1.25rem]">
+                          <Trophy className="w-5 h-5 text-rose-400" />
+                          <span className="font-black text-rose-400">{stat.cappottiCount}</span>
                         </div>
                       </td>
-                      <td className="p-4 text-center">
-                        <span className="text-sm font-black text-slate-300">{stat.playConclusi}</span>
+                      <td className="p-1.5 text-center">
+                        <span className="text-[1.25rem] font-black text-slate-300">{stat.playConclusi}</span>
                       </td>
-                      <td className="p-4 text-center">
-                        <span className="text-sm font-black text-slate-500">{stat.restConclusi}</span>
+                      <td className="p-1.5 text-center">
+                        <span className="text-[1.25rem] font-black text-slate-500">{stat.restConclusi}</span>
                       </td>
                     </tr>
                   ))}
@@ -401,7 +492,13 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
       {!forceStats && (
         <div className="bg-slate-900 border border-slate-700 rounded-2xl p-2 sm:p-4 shadow-2xl overflow-hidden w-full max-w-[1800px]">
           <div className="flex flex-col sm:flex-row justify-between items-center mb-4 px-2">
-            <h2 className="text-lg font-black text-white tracking-tight uppercase">Planning Torneo</h2>
+            <h2 className="text-lg font-black text-white tracking-tight uppercase">{data.tournamentName} - Planning</h2>
+            <button 
+                onClick={exportPlanningXLS}
+                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 border border-slate-700"
+            >
+                <Download className="w-4 h-4" /> Esporta XLS
+            </button>
           </div>
           
           <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
@@ -442,31 +539,32 @@ const PlanningView: React.FC<PlanningViewProps> = ({ data, showScores = false, c
               <tbody>
                 {data.planningCompleto.map((mano, idx) => {
                   const isFirstRecupero = mano.fase === 'recupero' && (idx === 0 || data.planningCompleto[idx-1].fase !== 'recupero');
+                  const isFirstSocial = mano.fase === 'social' && (idx === 0 || data.planningCompleto[idx-1].fase !== 'social');
                   const isFirstTop = mano.fase === 'top' && (idx === 0 || data.planningCompleto[idx-1].fase !== 'top');
                   const isCurrentMano = data.manoAttuale === mano.mano && data.status !== 'finished';
                   
                   return (
                     <React.Fragment key={idx}>
-                      {isFirstRecupero && (
-                        <tr className="bg-amber-600/30">
-                          <td colSpan={2 + maxTavoli * 4 + 1} className="p-2 text-center border-y border-amber-500/50">
-                            <div className="flex items-center justify-center gap-3">
-                              <Zap className="w-5 h-5 text-amber-400 fill-amber-400" />
-                              <span className="text-[12px] font-black uppercase tracking-[0.3em] text-white drop-shadow-md">FASE LEA</span>
-                              <Zap className="w-5 h-5 text-amber-400 fill-amber-400" />
+                      {(isFirstSocial || isFirstTop) && (
+                        <tr className="bg-emerald-900/40">
+                          <td colSpan={2 + maxTavoli * 4 + 1} className="p-3 text-center border-y border-emerald-500/40">
+                            <div className="flex items-center justify-center gap-2">
+                              <Target className="w-5 h-5 text-emerald-400" />
+                              <span className="text-[14px] font-black uppercase tracking-[0.2em] text-emerald-400">
+                                  {mano.fase === 'top' ? `FASE TOP (${finalPlayersCount} GIOCATORI)` : 'FASE SOCIAL'}
+                              </span>
                             </div>
+                            {mano.fase === 'top' && eliminatedNames && <span className="text-[10px] text-rose-400/90 font-medium tracking-tight block">Eliminati: {eliminatedNames}</span>}
                           </td>
                         </tr>
                       )}
-                      {isFirstTop && (
-                        <tr className="bg-emerald-900/40">
-                          <td colSpan={2 + maxTavoli * 4 + 1} className="p-3 text-center border-y border-emerald-500/40">
-                            <div className="flex flex-col items-center">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Target className="w-5 h-5 text-emerald-400" />
-                                <span className="text-[14px] font-black uppercase tracking-[0.2em] text-emerald-400">FASE TOP ({finalPlayersCount} GIOCATORI)</span>
-                              </div>
-                              {eliminatedNames && <span className="text-[10px] text-rose-400/90 font-medium tracking-tight">Eliminati: {eliminatedNames}</span>}
+                      {isFirstRecupero && (
+                        <tr className="bg-amber-600/20">
+                          <td colSpan={2 + maxTavoli * 4 + 1} className="p-2 text-center border-y border-amber-500/50">
+                            <div className="flex items-center justify-center gap-3">
+                              <Zap className="w-5 h-5 text-amber-400 fill-amber-400" />
+                              <span className="text-[12px] font-black uppercase tracking-[0.3em] text-white drop-shadow-md">FASE LEA (RECUPERO)</span>
+                              <Zap className="w-5 h-5 text-amber-400 fill-amber-400" />
                             </div>
                           </td>
                         </tr>

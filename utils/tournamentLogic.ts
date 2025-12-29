@@ -66,7 +66,6 @@ export function updateRelazioni(table: string[], relazioni: Record<string, numbe
 }
 
 export function generatePlanning(config: TournamentConfig, players: Player[]): { planning: HandAssignment[], relazioni: Record<string, number[]> } {
-  const planning: HandAssignment[] = [];
   const relazioni: Record<string, number[]> = {};
   const playerIds = players.map(p => p.id);
   const restCounts: Record<string, number> = Object.fromEntries(playerIds.map(id => [id, 0]));
@@ -126,28 +125,47 @@ export function generatePlanning(config: TournamentConfig, players: Player[]): {
     return { mano: manoIdx, tavoli: currentManoTavoli, riposanti, fase };
   };
 
+  const socialHands: HandAssignment[] = [];
+  const recoveryHands: HandAssignment[] = [];
+  const topHands: HandAssignment[] = [];
+
+  // 1. Genera Fase Social
   for (let m = 1; m <= config.maniFase1; m++) {
-    planning.push(generateSingleHand(m, 'social'));
+    socialHands.push(generateSingleHand(m, 'social'));
   }
 
-  let currentManoIdx = config.maniFase1 + 1;
+  // 2. Genera Fase Recupero per bilanciare i riposi
   const areRestsEqual = () => {
     const counts = Object.values(restCounts);
     return Math.max(...counts) === Math.min(...counts);
   };
 
+  let recIdx = config.maniFase1 + 1;
   while (!areRestsEqual()) {
     const maxR = Math.max(...Object.values(restCounts));
     const luckyOnes = playerIds.filter(id => restCounts[id] >= maxR);
     const tablesInRecupero = Math.max(1, Math.min(numTavoliMax, Math.floor(luckyOnes.length / 4)));
     
-    planning.push(generateSingleHand(currentManoIdx, 'recupero', tablesInRecupero));
-    currentManoIdx++;
-    if (currentManoIdx > config.maniFase1 + 20) break;
+    recoveryHands.push(generateSingleHand(recIdx, 'recupero', tablesInRecupero));
+    recIdx++;
+    if (recIdx > config.maniFase1 + 20) break;
   }
 
+  // Componi social e recupero secondo la preferenza dell'utente
+  let preliminaryHands: HandAssignment[] = [];
+  if (config.recoveryPosition === 'start') {
+    preliminaryHands = [...recoveryHands, ...socialHands];
+  } else {
+    preliminaryHands = [...socialHands, ...recoveryHands];
+  }
+
+  // Riassegna i numeri delle mani per coerenza sequenziale
+  preliminaryHands = preliminaryHands.map((h, i) => ({ ...h, mano: i + 1 }));
+
+  // 3. Genera Fase TOP (placeholder)
+  let currentManoIdx = preliminaryHands.length + 1;
   for (let m = 0; m < config.maniFase2; m++) {
-    planning.push({
+    topHands.push({
       mano: currentManoIdx + m,
       tavoli: [], 
       riposanti: [],
@@ -155,7 +173,10 @@ export function generatePlanning(config: TournamentConfig, players: Player[]): {
     });
   }
 
-  return { planning, relazioni };
+  return { 
+    planning: [...preliminaryHands, ...topHands], 
+    relazioni 
+  };
 }
 
 export function generateNextTopHand(data: {
@@ -264,7 +285,7 @@ export function generateNextTopHand(data: {
             let conflictsB = 0;
             table.forEach(pInTable => {
               const keyA = a < pInTable ? `${a}:${pInTable}` : `${pInTable}:${a}`;
-              const keyB = b < pInTable ? `${b}:${pInTable}` : `${pInTable}:${b}`;
+              const keyB = b < pInTable ? `${pInTable}:${b}` : `${b}:${pInTable}`;
               conflictsA += (data.storicoRelazioni[keyA]?.length || 0);
               conflictsB += (data.storicoRelazioni[keyB]?.length || 0);
             });
